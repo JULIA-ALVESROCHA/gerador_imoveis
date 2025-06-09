@@ -1,11 +1,20 @@
 /**
- * Sistema de Gestão de Imóveis - Versão Completa
+ * Sistema de Gestão de Imóveis - AEDs I – Prática (DCE794) - Ciência da Computação (08)
  * Júlia Alves da Rocha - 2025.1.08.015
- * Adaptado para formato BD_Imoveis2.txt
+ *  * * =======================================================================================
+ * DESCRIÇÃO GERAL DO CÓDIGO
+ * =======================================================================================
+ * Este programa é um sistema de gerenciamento de imóveis baseado em console.
+ * Ele permite cadastrar, listar, buscar, excluir e gerar relatórios estatísticos
+ * sobre imóveis. Os dados são persistidos (salvos e carregados) em um arquivo de
+ * texto chamado "BD_Imoveis2.txt", permitindo que as informações não se percam
+ * ao fechar o programa.
+ * =======================================================================================
  */
 
+//Bibliotecas 
 #include <iostream>
-#include <vector>
+#include <vector> 
 #include <fstream>
 #include <string>
 #include <iomanip>
@@ -14,7 +23,7 @@
 
 using namespace std;
 
-// Estrutura do imóvel conforme BD_Imoveis2.txt
+//Estrutura de Dados
 struct Imovel {
     string tipo;           // casa, apartamento, comercial
     string finalidade;     // venda, aluguel, temporada
@@ -42,10 +51,10 @@ struct Imovel {
 
 // Variáveis globais
 vector<Imovel> imoveis;
-const string ARQUIVO = "BD_Imoveis2.txt";
+const string ARQUIVO = "BD_Imoveis2.txt"; 
 const int MAX_REGISTROS = 200;
 
-// Protótipos das funções
+// Protótipos das funções com nomes autoexplicativos
 void mostrarMenu();
 void incluirImovel();
 void listarImoveis();
@@ -111,6 +120,7 @@ int main() {
     return 0;
 }
 
+//Mostrar ao usuário as opções do menu principal
 void mostrarMenu() {
     limparTela();
     cout << "================================" << endl;
@@ -130,6 +140,7 @@ void mostrarMenu() {
     cout << "================================" << endl;
 }
 
+//Tratamento de Erro - ajuda a melhor ler a resposta sim ou não do usuário
 string lerSimNao(const string& pergunta) {
     char resposta;
     cout << pergunta << " (s/n): ";
@@ -137,9 +148,11 @@ string lerSimNao(const string& pergunta) {
     return (resposta == 's' || resposta == 'S') ? "sim" : "não";
 }
 
+//Solicita os dados de um novo imóvel ao usuário e o adiciona ao vetor 'imoveis'.
 void incluirImovel() {
     limparTela();
     
+    //Verifica o tamanho atual do arquivo 
     if(imoveis.size() >= MAX_REGISTROS) {
         cout << "Limite máximo de " << MAX_REGISTROS << " registros atingido!" << endl;
         pausar();
@@ -148,10 +161,10 @@ void incluirImovel() {
     
     cout << "=== INCLUIR NOVO IMOVEL ===" << endl;
     
-    Imovel novo;
+    Imovel novo; 
     
     cout << "Tipo (casa/apartamento/comercial): ";
-    cin.ignore();
+    cin.ignore(); // limpar o buffer 
     getline(cin, novo.tipo);
     
     cout << "Finalidade (venda/aluguel/temporada): ";
@@ -217,6 +230,7 @@ void incluirImovel() {
     pausar();
 }
 
+// Exibe na tela todos os imóveis cadastrados no sistema
 void listarImoveis() {
     limparTela();
     if(imoveis.empty()) {
