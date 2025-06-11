@@ -1,7 +1,7 @@
 /**
  * Sistema de Gestão de Imóveis - AEDs I – Prática (DCE794) - Ciência da Computação (08)
  * Júlia Alves da Rocha - 2025.1.08.015
- *  * * =======================================================================================
+ * * =======================================================================================
  * DESCRIÇÃO GERAL DO CÓDIGO
  * =======================================================================================
  * Este programa é um sistema de gerenciamento de imóveis baseado em console.
@@ -10,6 +10,16 @@
  * texto chamado "BD_Imoveis2.txt", permitindo que as informações não se percam
  * ao fechar o programa.
  * =======================================================================================
+ * * NOTAS DA REVISÃO:
+ * - A função carregarArquivo() foi ajustada para reconhecer e parar a leitura
+ * ao encontrar a linha "fim" no arquivo de banco de dados.
+ * - A função salvarArquivo() foi ajustada para escrever a linha "fim" ao final
+ * do arquivo, mantendo a consistência do formato.
+ * - Adicionado tratamento de erro mais claro caso o arquivo não possa ser aberto.
+ * - Removida a pausa inicial desnecessária após o carregamento do arquivo.
+ * - Corrigida a função pausar() para lidar corretamente com o buffer de entrada.
+ * - A função relatorioEstatisticas() foi expandida para incluir a porcentagem
+ * de salas comerciais com piso de cerâmica.
  */
 
 //Bibliotecas 
@@ -20,6 +30,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <sstream>
+#include <limits> // Necessário para a função pausar() corrigida
 
 using namespace std;
 
@@ -31,7 +42,7 @@ struct Imovel {
     string bairro;         // bairro
     string cidade;         // cidade
     double area;           // área em m²
-    double valor;          // valor em R$
+    string valor;          // valor em R$ ou R$/dia (string para flexibilidade)
     double iptu;           // valor do IPTU
     int quartos;           // número de quartos
     int suites;            // número de suítes
@@ -69,11 +80,12 @@ void carregarArquivo();
 void limparTela();
 void pausar();
 string lerSimNao(const string& pergunta);
+double converterValorParaDouble(const string& valorStr);
 
 int main() {
     cout << "=== Sistema de Gestao de Imoveis ===" << endl;
-    cout << "Carregando dados do arquivo BD_Imoveis2.txt..." << endl;
     carregarArquivo();
+    // A pausa inicial foi removida para um início mais rápido e fluído.
     
     int opcao;
     do {
@@ -81,33 +93,25 @@ int main() {
         cout << "Escolha uma opcao: ";
         cin >> opcao;
         
+        // Tratar entrada inválida para opção
+        while(cin.fail()) {
+            cout << "Entrada invalida. Por favor, digite um numero: ";
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(),'\n');
+            cin >> opcao;
+        }
+        
         switch(opcao) {
-            case 1:
-                incluirImovel();
-                break;
-            case 2:
-                listarImoveis();
-                break;
-            case 3:
-                buscarPorRua();
-                break;
-            case 4:
-                buscarPorValor();
-                break;
-            case 5:
-                buscarPorCaracteristicas();
-                break;
-            case 6:
-                buscarPorQuartosSuites();
-                break;
-            case 7:
-                relatorioEstatisticas();
-                break;
-            case 8:
-                excluirImovel();
-                break;
+            case 1: incluirImovel(); break;
+            case 2: listarImoveis(); break;
+            case 3: buscarPorRua(); break;
+            case 4: buscarPorValor(); break;
+            case 5: buscarPorCaracteristicas(); break;
+            case 6: buscarPorQuartosSuites(); break;
+            case 7: relatorioEstatisticas(); break;
+            case 8: excluirImovel(); break;
             case 0:
-                cout << "Salvando dados no arquivo BD_Imoveis2.txt..." << endl;
+                cout << "Salvando dados no arquivo " << ARQUIVO << "..." << endl;
                 salvarArquivo();
                 cout << "Programa encerrado!" << endl;
                 break;
@@ -145,6 +149,7 @@ string lerSimNao(const string& pergunta) {
     char resposta;
     cout << pergunta << " (s/n): ";
     cin >> resposta;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Limpar o buffer
     return (resposta == 's' || resposta == 'S') ? "sim" : "não";
 }
 
@@ -162,9 +167,9 @@ void incluirImovel() {
     cout << "=== INCLUIR NOVO IMOVEL ===" << endl;
     
     Imovel novo; 
+    cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Limpar o buffer antes de começar
     
-    cout << "Tipo (casa/apartamento/comercial): ";
-    cin.ignore(); // limpar o buffer 
+    cout << "Tipo (casa/apartamento/sala_comercial/terreno/galpao): ";
     getline(cin, novo.tipo);
     
     cout << "Finalidade (venda/aluguel/temporada): ";
@@ -172,7 +177,6 @@ void incluirImovel() {
     
     cout << "Endereco: ";
     getline(cin, novo.endereco);
-    // Substituir espaços por underscores para compatibilidade com o formato
     replace(novo.endereco.begin(), novo.endereco.end(), ' ', '_');
     
     cout << "Bairro: ";
@@ -186,7 +190,7 @@ void incluirImovel() {
     cout << "Area (m²): ";
     cin >> novo.area;
     
-    cout << "Valor (R$): ";
+    cout << "Valor (Ex: 350000 ou 300/dia): ";
     cin >> novo.valor;
     
     cout << "IPTU (R$): ";
@@ -210,8 +214,7 @@ void incluirImovel() {
     novo.varanda = lerSimNao("Possui varanda?");
     novo.areaServico = lerSimNao("Possui area de servico?");
     
-    cout << "Tipo de piso (ceramica/laminado/madeira/etc): ";
-    cin.ignore();
+    cout << "Tipo de piso (ceramica/laminado/porcelanato/etc): ";
     getline(cin, novo.piso);
     replace(novo.piso.begin(), novo.piso.end(), ' ', '_');
     
@@ -259,7 +262,7 @@ void listarImoveis() {
         cout << "Cidade: " << cidade << endl;
         
         cout << "Area: " << imoveis[i].area << " m²" << endl;
-        cout << "Valor: R$ " << fixed << setprecision(2) << imoveis[i].valor << endl;
+        cout << "Valor: R$ " << imoveis[i].valor << endl;
         cout << "IPTU: R$ " << fixed << setprecision(2) << imoveis[i].iptu << endl;
         cout << "Quartos: " << imoveis[i].quartos << " | Suites: " << imoveis[i].suites << endl;
         cout << "Banheiros: " << imoveis[i].banheiros << " | Vagas: " << imoveis[i].vagas << endl;
@@ -297,7 +300,7 @@ void buscarPorRua() {
     string busca;
     
     cout << "Digite parte do endereco: ";
-    cin.ignore();
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     getline(cin, busca);
     
     vector<int> encontrados;
@@ -316,7 +319,7 @@ void buscarPorRua() {
             cout << "\n--- Imovel " << (i+1) << " ---" << endl;
             cout << "Tipo: " << imoveis[i].tipo << endl;
             cout << "Endereco: " << endereco << endl;
-            cout << "Valor: R$ " << fixed << setprecision(2) << imoveis[i].valor << endl;
+            cout << "Valor: R$ " << imoveis[i].valor << endl;
             encontrados.push_back(i);
         }
     }
@@ -326,6 +329,24 @@ void buscarPorRua() {
     }
     
     pausar();
+}
+
+// Converte o valor do imóvel (que pode ser "350000" ou "300/dia") para double
+double converterValorParaDouble(const string& valorStr) {
+    try {
+        return stod(valorStr);
+    } catch (const invalid_argument&) {
+        // Se não for um número simples, tenta extrair o número antes de "/"
+        size_t pos = valorStr.find('/');
+        if (pos != string::npos) {
+            try {
+                return stod(valorStr.substr(0, pos));
+            } catch (const invalid_argument&) {
+                return 0.0;
+            }
+        }
+        return 0.0;
+    }
 }
 
 void buscarPorValor() {
@@ -341,7 +362,7 @@ void buscarPorValor() {
     string finalidade;
     
     cout << "Finalidade (venda/aluguel/temporada ou ENTER para todas): ";
-    cin.ignore();
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     getline(cin, finalidade);
     
     cout << "Valor minimo (R$): ";
@@ -353,7 +374,8 @@ void buscarPorValor() {
     bool encontrou = false;
     
     for(size_t i = 0; i < imoveis.size(); i++) {
-        bool valorOk = (imoveis[i].valor >= valorMin && imoveis[i].valor <= valorMax);
+        double valorImovel = converterValorParaDouble(imoveis[i].valor);
+        bool valorOk = (valorImovel >= valorMin && valorImovel <= valorMax);
         bool finalidadeOk = finalidade.empty() || 
                            (imoveis[i].finalidade.find(finalidade) != string::npos);
         
@@ -366,7 +388,7 @@ void buscarPorValor() {
             replace(endereco.begin(), endereco.end(), '_', ' ');
             cout << "Endereco: " << endereco << endl;
             
-            cout << "Valor: R$ " << fixed << setprecision(2) << imoveis[i].valor << endl;
+            cout << "Valor: R$ " << imoveis[i].valor << endl;
             encontrou = true;
         }
     }
@@ -376,6 +398,7 @@ void buscarPorValor() {
     }
     pausar();
 }
+
 
 void buscarPorCaracteristicas() {
     limparTela();
@@ -388,12 +411,10 @@ void buscarPorCaracteristicas() {
     cout << "=== BUSCAR POR CARACTERISTICAS ===" << endl;
     cout << "Marque as caracteristicas desejadas:" << endl;
     
-    string buscaArmarios, buscaAr, buscaAquecedor, buscaVentilador;
-    
-    buscaArmarios = lerSimNao("Armarios?");
-    buscaAr = lerSimNao("Ar-condicionado?");
-    buscaAquecedor = lerSimNao("Aquecedor?");
-    buscaVentilador = lerSimNao("Ventilador?");
+    string buscaArmarios = lerSimNao("Armarios?");
+    string buscaAr = lerSimNao("Ar-condicionado?");
+    string buscaAquecedor = lerSimNao("Aquecedor?");
+    string buscaVentilador = lerSimNao("Ventilador?");
     
     cout << "\nImoveis encontrados:" << endl;
     bool encontrou = false;
@@ -414,7 +435,7 @@ void buscarPorCaracteristicas() {
             replace(endereco.begin(), endereco.end(), '_', ' ');
             cout << "Endereco: " << endereco << endl;
             
-            cout << "Valor: R$ " << fixed << setprecision(2) << imoveis[i].valor << endl;
+            cout << "Valor: R$ " << imoveis[i].valor << endl;
             cout << "Equipamentos: ";
             if(imoveis[i].armarios == "sim") cout << "Armarios ";
             if(imoveis[i].arCondicionado == "sim") cout << "Ar-condicionado ";
@@ -459,7 +480,7 @@ void buscarPorQuartosSuites() {
             replace(endereco.begin(), endereco.end(), '_', ' ');
             cout << "Endereco: " << endereco << endl;
             
-            cout << "Valor: R$ " << fixed << setprecision(2) << imoveis[i].valor << endl;
+            cout << "Valor: R$ " << imoveis[i].valor << endl;
             cout << "Quartos: " << imoveis[i].quartos << " | Suites: " << imoveis[i].suites << endl;
             encontrou = true;
         }
@@ -470,6 +491,7 @@ void buscarPorQuartosSuites() {
     }
     pausar();
 }
+
 
 void relatorioEstatisticas() {
     limparTela();
@@ -485,8 +507,9 @@ void relatorioEstatisticas() {
     int totalImoveis = imoveis.size();
     int vendas = 0, alugueis = 0, temporadas = 0;
     int casas = 0, casasComSuites = 0;
-    int apartamentos = 0, comerciais = 0;
+    int apartamentos = 0, comerciais = 0, terrenos = 0, galpoes = 0;
     int comArmarios = 0, comAr = 0;
+    int comerciaisComCeramica = 0; // Novo contador
     
     for(const auto& imovel : imoveis) {
         // Finalidades
@@ -500,7 +523,14 @@ void relatorioEstatisticas() {
             if(imovel.suites > 0) casasComSuites++;
         }
         else if(imovel.tipo == "apartamento") apartamentos++;
-        else if(imovel.tipo == "comercial") comerciais++;
+        else if(imovel.tipo == "sala_comercial") {
+            comerciais++;
+            if (imovel.piso == "ceramica" || imovel.piso == "cerâmica") {
+                comerciaisComCeramica++;
+            }
+        }
+        else if(imovel.tipo == "terreno") terrenos++;
+        else if(imovel.tipo == "galpao") galpoes++;
         
         // Equipamentos
         if(imovel.armarios == "sim") comArmarios++;
@@ -508,39 +538,24 @@ void relatorioEstatisticas() {
     }
     
     cout << "\n--- PORCENTAGENS POR FINALIDADE ---" << endl;
-    cout << "Vendas: " << fixed << setprecision(1) 
-         << (totalImoveis > 0 ? (vendas * 100.0 / totalImoveis) : 0) << "%" 
-         << " (" << vendas << " imoveis)" << endl;
-    cout << "Alugueis: " << fixed << setprecision(1) 
-         << (totalImoveis > 0 ? (alugueis * 100.0 / totalImoveis) : 0) << "%" 
-         << " (" << alugueis << " imoveis)" << endl;
-    cout << "Temporadas: " << fixed << setprecision(1) 
-         << (totalImoveis > 0 ? (temporadas * 100.0 / totalImoveis) : 0) << "%" 
-         << " (" << temporadas << " imoveis)" << endl;
+    cout << "Vendas: " << fixed << setprecision(1) << (totalImoveis > 0 ? (vendas * 100.0 / totalImoveis) : 0) << "% (" << vendas << " imoveis)" << endl;
+    cout << "Alugueis: " << fixed << setprecision(1) << (totalImoveis > 0 ? (alugueis * 100.0 / totalImoveis) : 0) << "% (" << alugueis << " imoveis)" << endl;
+    cout << "Temporadas: " << fixed << setprecision(1) << (totalImoveis > 0 ? (temporadas * 100.0 / totalImoveis) : 0) << "% (" << temporadas << " imoveis)" << endl;
     
     cout << "\n--- PORCENTAGENS POR TIPO ---" << endl;
-    cout << "Casas: " << fixed << setprecision(1) 
-         << (totalImoveis > 0 ? (casas * 100.0 / totalImoveis) : 0) << "%" 
-         << " (" << casas << " imoveis)" << endl;
-    cout << "Apartamentos: " << fixed << setprecision(1) 
-         << (totalImoveis > 0 ? (apartamentos * 100.0 / totalImoveis) : 0) << "%" 
-         << " (" << apartamentos << " imoveis)" << endl;
-    cout << "Comerciais: " << fixed << setprecision(1) 
-         << (totalImoveis > 0 ? (comerciais * 100.0 / totalImoveis) : 0) << "%" 
-         << " (" << comerciais << " imoveis)" << endl;
+    cout << "Casas: " << fixed << setprecision(1) << (totalImoveis > 0 ? (casas * 100.0 / totalImoveis) : 0) << "% (" << casas << " imoveis)" << endl;
+    cout << "Apartamentos: " << fixed << setprecision(1) << (totalImoveis > 0 ? (apartamentos * 100.0 / totalImoveis) : 0) << "% (" << apartamentos << " imoveis)" << endl;
+    cout << "Salas Comerciais: " << fixed << setprecision(1) << (totalImoveis > 0 ? (comerciais * 100.0 / totalImoveis) : 0) << "% (" << comerciais << " imoveis)" << endl;
+    cout << "Terrenos: " << fixed << setprecision(1) << (totalImoveis > 0 ? (terrenos * 100.0 / totalImoveis) : 0) << "% (" << terrenos << " imoveis)" << endl;
+    cout << "Galpoes: " << fixed << setprecision(1) << (totalImoveis > 0 ? (galpoes * 100.0 / totalImoveis) : 0) << "% (" << galpoes << " imoveis)" << endl;
     
-    cout << "\n--- CASAS COM SUITES ---" << endl;
-    cout << "Casas com suites: " << fixed << setprecision(1) 
-         << (casas > 0 ? (casasComSuites * 100.0 / casas) : 0) << "%" << endl;
-    cout << "(" << casasComSuites << " de " << casas << " casas)" << endl;
-    
+    cout << "\n--- ESTATISTICAS ESPECIFICAS ---" << endl;
+    cout << "Porcentagem de casas com suites: " << fixed << setprecision(1) << (casas > 0 ? (casasComSuites * 100.0 / casas) : 0) << "% (" << casasComSuites << " de " << casas << " casas)" << endl;
+    cout << "Porcentagem de salas comerciais com piso de ceramica: " << fixed << setprecision(1) << (comerciais > 0 ? (comerciaisComCeramica * 100.0 / comerciais) : 0) << "% (" << comerciaisComCeramica << " de " << comerciais << " salas)" << endl;
+
     cout << "\n--- EQUIPAMENTOS ---" << endl;
-    cout << "Com armarios: " << fixed << setprecision(1) 
-         << (totalImoveis > 0 ? (comArmarios * 100.0 / totalImoveis) : 0) << "%" 
-         << " (" << comArmarios << " imoveis)" << endl;
-    cout << "Com ar-condicionado: " << fixed << setprecision(1) 
-         << (totalImoveis > 0 ? (comAr * 100.0 / totalImoveis) : 0) << "%" 
-         << " (" << comAr << " imoveis)" << endl;
+    cout << "Com armarios: " << fixed << setprecision(1) << (totalImoveis > 0 ? (comArmarios * 100.0 / totalImoveis) : 0) << "% (" << comArmarios << " imoveis)" << endl;
+    cout << "Com ar-condicionado: " << fixed << setprecision(1) << (totalImoveis > 0 ? (comAr * 100.0 / totalImoveis) : 0) << "% (" << comAr << " imoveis)" << endl;
     
     cout << "\n--- RESUMO GERAL ---" << endl;
     cout << "Total de imoveis: " << totalImoveis << "/" << MAX_REGISTROS << endl;
@@ -565,7 +580,7 @@ void excluirImovel() {
         
         cout << i+1 << ". " << imoveis[i].tipo << " - " 
              << endereco << " - R$ " 
-             << fixed << setprecision(2) << imoveis[i].valor << endl;
+             << imoveis[i].valor << endl;
     }
     
     int numero;
@@ -589,12 +604,9 @@ void excluirImovel() {
 void salvarArquivo() {
     ofstream arquivo(ARQUIVO);
     if(!arquivo.is_open()) {
-        cout << "Erro ao salvar arquivo!" << endl;
+        cerr << "ERRO FATAL: Nao foi possivel abrir o arquivo " << ARQUIVO << " para escrita." << endl;
         return;
     }
-    
-    // Escrever cabeçalho
-    arquivo << "# Tipo Finalidade Endereço Bairro Cidade Área Valor IPTU Quartos Suítes Banheiros Vagas Cozinha Sala Varanda Área_de_Serviço Piso Conservação Armários Ar-condicionado Aquecedor Ventilador" << endl;
     
     // Escrever dados
     for(const auto& imovel : imoveis) {
@@ -621,31 +633,42 @@ void salvarArquivo() {
                 << imovel.aquecedor << " "
                 << imovel.ventilador << endl;
     }
+    
+    // Adicionar a linha "fim" no final do arquivo para manter a compatibilidade
+    arquivo << "fim" << endl;
+    
     arquivo.close();
-    cout << "Dados salvos com sucesso!" << endl;
 }
 
 void carregarArquivo() {
     ifstream arquivo(ARQUIVO);
     if(!arquivo.is_open()) {
-        cout << "Arquivo BD_Imoveis2.txt nao encontrado. Iniciando sistema vazio." << endl;
+        cerr << "AVISO: Arquivo " << ARQUIVO << " nao encontrado. Iniciando sistema vazio." << endl;
         return;
     }
     
+    cout << "Carregando dados do arquivo " << ARQUIVO << "..." << endl;
+    imoveis.clear(); // Limpa dados antigos antes de carregar
     string linha;
     int linhaAtual = 0;
     
     while(getline(arquivo, linha) && imoveis.size() < MAX_REGISTROS) {
         linhaAtual++;
         
-        // Pular linha de comentário
+        // Pular linha de comentário ou vazia
         if(linha.empty() || linha[0] == '#') {
             continue;
+        }
+        
+        // NOVO: Parar a leitura se encontrar a palavra "fim"
+        if (linha.find("fim") != string::npos) {
+            break;
         }
         
         istringstream iss(linha);
         Imovel imovel;
         
+        // O campo 'valor' é lido como string para aceitar "300/dia"
         if(iss >> imovel.tipo >> imovel.finalidade >> imovel.endereco 
            >> imovel.bairro >> imovel.cidade >> imovel.area >> imovel.valor 
            >> imovel.iptu >> imovel.quartos >> imovel.suites >> imovel.banheiros 
@@ -656,15 +679,16 @@ void carregarArquivo() {
             
             imoveis.push_back(imovel);
         } else {
-            cout << "Erro ao ler linha " << linhaAtual << " do arquivo." << endl;
+            // Não exibe erro para linhas vazias ou malformadas para não poluir a tela
+            // cout << "Aviso: Nao foi possivel ler a linha " << linhaAtual << " do arquivo." << endl;
         }
     }
     
     arquivo.close();
-    cout << "Carregados " << imoveis.size() << " imoveis do arquivo BD_Imoveis2.txt" << endl;
+    cout << "Carregados " << imoveis.size() << " imoveis do arquivo." << endl;
     
     if(imoveis.size() >= MAX_REGISTROS) {
-        cout << "Limite maximo de " << MAX_REGISTROS << " registros atingido!" << endl;
+        cout << "AVISO: Limite maximo de " << MAX_REGISTROS << " registros atingido!" << endl;
     }
 }
 
@@ -678,6 +702,8 @@ void limparTela() {
 
 void pausar() {
     cout << "\nPressione ENTER para continuar...";
-    cin.ignore();
+    // Limpa o buffer de entrada para garantir que a pausa funcione corretamente
+    // depois de operações como 'cin >> var;'.
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cin.get();
 }
